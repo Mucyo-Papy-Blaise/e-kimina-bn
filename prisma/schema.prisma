@@ -1,0 +1,101 @@
+// E-kimina — relational RBAC, groups, loan configuration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoleName {
+  USER
+  SUPER_ADMIN
+  GROUP_ADMIN
+  TREASURER
+  MEMBER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  phoneNumber  String?
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  platformRoles UserPlatformRole[]
+  userGroups    UserGroup[]
+  createdGroups Group[]            @relation("GroupCreator")
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdById String
+  isVerified  Boolean  @default(false)
+  maxMembers  Int
+  createdAt   DateTime @default(now())
+
+  createdBy  User         @relation("GroupCreator", fields: [createdById], references: [id])
+  userGroups UserGroup[]
+  loanConfig LoanConfig?
+
+  @@index([createdById])
+}
+
+model Role {
+  id   String   @id @default(cuid())
+  name RoleName @unique
+
+  platformAssignments UserPlatformRole[]
+  userGroups          UserGroup[]
+}
+
+/// Group membership: one role per user per group (relational RBAC).
+model UserGroup {
+  id       String   @id @default(cuid())
+  userId   String
+  groupId  String
+  roleId   String
+  joinedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role  Role  @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+/// Platform-level role: default `USER`, elevated e.g. `SUPER_ADMIN`. Not tied to a group.
+model UserPlatformRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@unique([userId])
+}
+
+model LoanConfig {
+  id                   String   @id @default(cuid())
+  groupId              String   @unique
+  interestRate         Decimal  @db.Decimal(8, 5)
+  maxLoanAmount        Decimal  @db.Decimal(14, 2)
+  repaymentPeriodDays  Int
+  penaltyRate          Decimal  @db.Decimal(8, 5)
+  allowPartialPayments Boolean
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
