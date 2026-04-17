@@ -17,6 +17,9 @@ export class GroupResponseDto {
   isVerified!: boolean;
 
   @ApiProperty()
+  isPublic!: boolean;
+
+  @ApiProperty()
   maxMembers!: number;
 
   @ApiProperty()

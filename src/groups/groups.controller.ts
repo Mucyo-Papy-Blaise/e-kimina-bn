@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -48,11 +49,27 @@ export class GroupsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List groups with derived member counts' })
+  @ApiOperation({
+    summary: 'List groups with derived member counts',
+    description:
+      '`view=mine` — groups you created. `view=discover` — others’ public groups. `publicOnly=true` (without `view`) — legacy: all public groups.',
+  })
   @ApiOkResponse({ type: GroupResponseDto, isArray: true })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  findAll() {
-    return this.groupsService.findAll();
+  findAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('publicOnly') publicOnly?: string,
+    @Query('view') view?: string,
+  ) {
+    const onlyPublic =
+      publicOnly === 'true' || publicOnly === '1' || publicOnly === 'yes';
+    const normalizedView =
+      view === 'mine' || view === 'discover' ? view : undefined;
+
+    return this.groupsService.findAll(user.id, {
+      view: normalizedView,
+      legacyPublicOnly: onlyPublic && !normalizedView,
+    });
   }
 
   @Get(':groupId')
@@ -93,5 +110,22 @@ export class GroupsController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   verify(@Param('groupId') groupId: string) {
     return this.groupsService.verifyGroup(groupId);
+  }
+
+  @Patch(':groupId/toggle-public')
+  @Roles(RoleName.GROUP_ADMIN)
+  @ApiOperation({
+    summary: 'Toggle a group between public and private (GROUP_ADMIN only)',
+  })
+  @ApiParam({ name: 'groupId', type: String })
+  @ApiOkResponse({ type: GroupResponseDto })
+  @ApiNotFoundResponse({ description: 'Group not found' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  togglePublic(
+    @Param('groupId') groupId: string,
+    @Body('isPublic') isPublic: boolean,
+  ) {
+    return this.groupsService.togglePublic(groupId, isPublic);
   }
 }
