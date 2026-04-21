@@ -93,6 +93,7 @@ async function main(): Promise<void> {
         email: def.email,
         fullName: def.fullName,
         passwordHash,
+        emailVerified: true,
         platformRoles: {
           create: {
             role: { connect: { name: RoleName.USER } },
@@ -102,6 +103,7 @@ async function main(): Promise<void> {
       update: {
         fullName: def.fullName,
         passwordHash,
+        emailVerified: true,
       },
     });
     usersByEmail.set(def.email, user);
@@ -113,6 +115,8 @@ async function main(): Promise<void> {
     where: { name: SEED_GROUP_NAME },
   });
 
+  console.log('this is group', group);
+
   if (!group) {
     group = await prisma.group.create({
       data: {
@@ -121,7 +125,7 @@ async function main(): Promise<void> {
           'Seeded group: GROUP_ADMIN, TREASURER, MEMBER (one user per role).',
         createdById: groupAdminUser.id,
         isVerified: true,
-        maxMembers: 100,
+        minMembers: 100,
       },
     });
   }

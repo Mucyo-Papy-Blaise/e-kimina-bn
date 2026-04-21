@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, RoleName } from '@prisma/client';
+import { GroupMembershipStatus, Prisma, RoleName } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const userSelect = {
@@ -12,6 +12,7 @@ const userSelect = {
   fullName: true,
   phoneNumber: true,
   image: true,
+  emailVerified: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -36,6 +37,9 @@ export interface CreateUserInput {
   fullName: string;
   phoneNumber?: string;
   image?: string;
+  emailVerified?: boolean;
+  emailVerificationOtpHash?: string | null;
+  emailVerificationExpiresAt?: Date | null;
 }
 
 @Injectable()
@@ -48,6 +52,7 @@ export class UsersService {
     fullName: string;
     phoneNumber: string | null;
     image: string | null;
+    emailVerified: boolean;
     createdAt: Date;
     updatedAt: Date;
     platformRoles: { role: { name: RoleName } }[];
@@ -76,6 +81,7 @@ export class UsersService {
         include: { role: { select: { name: true } } },
       },
       userGroups: {
+        where: { membershipStatus: GroupMembershipStatus.ACTIVE },
         select: {
           group: { select: { id: true, name: true } },
           role: { select: { name: true } },
@@ -93,6 +99,9 @@ export class UsersService {
           fullName: input.fullName,
           phoneNumber: input.phoneNumber,
           image: input.image,
+          emailVerified: input.emailVerified ?? true,
+          emailVerificationOtpHash: input.emailVerificationOtpHash ?? undefined,
+          emailVerificationExpiresAt: input.emailVerificationExpiresAt ?? undefined,
           platformRoles: {
             create: {
               role: { connect: { name: RoleName.USER } },

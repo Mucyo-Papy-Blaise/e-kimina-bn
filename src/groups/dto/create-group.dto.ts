@@ -24,9 +24,9 @@ export class CreateGroupDto {
   description?: string;
 
   @ApiPropertyOptional({
-    example: true,
+    example: false,
     description:
-      'If true, the group appears in the public directory and users can self-join.',
+      'If true, the group appears in the public directory and users can self-join. Defaults to false until public groups are finalized.',
   })
   @IsOptional()
   @IsBoolean()
@@ -38,12 +38,12 @@ export class CreateGroupDto {
   })
   @IsInt()
   @Min(2)
-  maxMembers!: number;
+  minMembers!: number;
 
   @ApiPropertyOptional({
     example: 'treasurer@example.com',
     description:
-      'Registered user email to assign as TREASURER for this group (must not be the creator).',
+      'Treasurer email. If they already have an active account, they are added as TREASURER. Otherwise a pending user is created and an invitation email is sent (must not be the creator).',
   })
   @IsOptional()
   @IsEmail()

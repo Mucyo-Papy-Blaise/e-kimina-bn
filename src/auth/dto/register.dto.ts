@@ -35,4 +35,14 @@ export class RegisterDto {
   @IsString()
   @MaxLength(2048)
   image?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Invitation token from email (treasurer or team member; completes a pending account).',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(16)
+  @MaxLength(128)
+  invitationToken?: string;
 }

@@ -5,7 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { RoleName } from '@prisma/client';
+import { GroupMembershipStatus, RoleName } from '@prisma/client';
 import { GROUP_ROLES_KEY } from '../../decorators/group-role.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
@@ -45,12 +45,11 @@ export class GroupRoleGuard implements CanActivate {
       );
     }
 
-    const membership = await this.prisma.userGroup.findUnique({
+    const membership = await this.prisma.userGroup.findFirst({
       where: {
-        userId_groupId: {
-          userId: user.id,
-          groupId,
-        },
+        userId: user.id,
+        groupId,
+        membershipStatus: GroupMembershipStatus.ACTIVE,
       },
       include: {
         role: true,

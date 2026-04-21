@@ -29,6 +29,11 @@ export class UserResponseDto {
   image!: string | null;
 
   @ApiProperty({
+    description: 'True after email verification (OTP) or treasurer invitation completion.',
+  })
+  emailVerified!: boolean;
+
+  @ApiProperty({
     enum: RoleName,
     example: RoleName.USER,
     description:

@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { GroupMembershipStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GroupsService } from '../groups/groups.service';
 import { UpsertLoanConfigDto } from './dto/upsert-loan-config.dto';
@@ -28,12 +28,11 @@ export class LoanConfigService {
       throw new NotFoundException(`Group ${groupId} was not found.`);
     }
 
-    const membership = await this.prisma.userGroup.findUnique({
+    const membership = await this.prisma.userGroup.findFirst({
       where: {
-        userId_groupId: {
-          userId,
-          groupId,
-        },
+        userId,
+        groupId,
+        membershipStatus: GroupMembershipStatus.ACTIVE,
       },
     });
 
