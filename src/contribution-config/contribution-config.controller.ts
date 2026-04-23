@@ -13,26 +13,28 @@ import { RoleName } from '@prisma/client';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { GroupRole } from '../decorators/group-role.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
-import { LoanConfigResponseDto } from './dto/loan-config-response.dto';
-import { UpsertLoanConfigDto } from './dto/upsert-loan-config.dto';
-import { LoanConfigService } from './loan-config.service';
+import { ContributionConfigResponseDto } from './dto/contribution-config-response.dto';
+import { UpsertContributionConfigDto } from './dto/upsert-contribution-config.dto';
+import { ContributionConfigService } from './contribution-config.service';
 
-@ApiTags('loan-config')
+@ApiTags('contribution-config')
 @ApiBearerAuth('JWT-auth')
-@Controller('groups/:groupId/loan-config')
-export class LoanConfigController {
-  constructor(private readonly loanConfigService: LoanConfigService) {}
+@Controller('groups/:groupId/contribution-config')
+export class ContributionConfigController {
+  constructor(
+    private readonly contributionConfigService: ContributionConfigService,
+  ) {}
 
   @Get()
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER, RoleName.MEMBER)
   @ApiOperation({
     summary:
-      'Get loan configuration for a verified group. Returns `null` if not configured yet (members may still read).',
+      'Get contribution schedule rules for a verified group. Returns `null` if not configured yet.',
   })
   @ApiParam({ name: 'groupId', type: String })
   @ApiOkResponse({
-    type: LoanConfigResponseDto,
-    description: 'Loan config, or `null` when none has been created.',
+    type: ContributionConfigResponseDto,
+    description: 'Config, or `null` when none has been created.',
   })
   @ApiNotFoundResponse({ description: 'Group not found' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
@@ -41,26 +43,26 @@ export class LoanConfigController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('groupId') groupId: string,
   ) {
-    return this.loanConfigService.getForMember(user.id, groupId);
+    return this.contributionConfigService.getForMember(user.id, groupId);
   }
 
   @Put()
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
   @ApiOperation({
     summary:
-      'Create or update loan configuration (GROUP_ADMIN or TREASURER; group must be verified)',
+      'Create or update contribution rules (GROUP_ADMIN or TREASURER; group must be verified).',
   })
   @ApiParam({ name: 'groupId', type: String })
-  @ApiOkResponse({ type: LoanConfigResponseDto })
+  @ApiOkResponse({ type: ContributionConfigResponseDto })
   @ApiNotFoundResponse({ description: 'Group not found' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   upsert(
     @CurrentUser() user: AuthenticatedUser,
     @Param('groupId') groupId: string,
-    @Body() dto: UpsertLoanConfigDto,
+    @Body() dto: UpsertContributionConfigDto,
   ) {
-    return this.loanConfigService.upsertForGroupAdminOrTreasurer(
+    return this.contributionConfigService.upsertForGroupAdminOrTreasurer(
       user.id,
       groupId,
       dto,

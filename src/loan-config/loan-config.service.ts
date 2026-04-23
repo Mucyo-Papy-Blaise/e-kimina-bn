@@ -51,7 +51,7 @@ export class LoanConfigService {
     });
 
     if (!config) {
-      throw new NotFoundException('Loan configuration has not been set up yet.');
+      return null;
     }
 
     return this.toResponse(config);
@@ -64,22 +64,33 @@ export class LoanConfigService {
   ) {
     await this.groupsService.assertUserCanAccessLoanConfig(userId, groupId);
 
+    const maxLoan =
+      dto.maxLoanMultiplier != null
+        ? new Prisma.Decimal(dto.maxLoanMultiplier)
+        : null;
+    const penalty =
+      dto.penaltyRate != null ? new Prisma.Decimal(dto.penaltyRate) : null;
+
     const config = await this.prisma.loanConfig.upsert({
       where: { groupId },
       create: {
         groupId,
         interestRate: new Prisma.Decimal(dto.interestRate),
-        maxLoanAmount: new Prisma.Decimal(dto.maxLoanAmount),
         repaymentPeriodDays: dto.repaymentPeriodDays,
-        penaltyRate: new Prisma.Decimal(dto.penaltyRate),
+        allowExceedContribution: dto.allowExceedContribution,
+        maxLoanMultiplier: maxLoan,
         allowPartialPayments: dto.allowPartialPayments,
+        penaltyRate: penalty,
+        gracePeriodDays: dto.gracePeriodDays,
       },
       update: {
         interestRate: new Prisma.Decimal(dto.interestRate),
-        maxLoanAmount: new Prisma.Decimal(dto.maxLoanAmount),
         repaymentPeriodDays: dto.repaymentPeriodDays,
-        penaltyRate: new Prisma.Decimal(dto.penaltyRate),
+        allowExceedContribution: dto.allowExceedContribution,
+        maxLoanMultiplier: maxLoan,
         allowPartialPayments: dto.allowPartialPayments,
+        penaltyRate: penalty,
+        gracePeriodDays: dto.gracePeriodDays,
       },
     });
 
@@ -90,10 +101,12 @@ export class LoanConfigService {
     id: string;
     groupId: string;
     interestRate: Prisma.Decimal;
-    maxLoanAmount: Prisma.Decimal;
     repaymentPeriodDays: number;
-    penaltyRate: Prisma.Decimal;
+    allowExceedContribution: boolean;
+    maxLoanMultiplier: Prisma.Decimal | null;
     allowPartialPayments: boolean;
+    penaltyRate: Prisma.Decimal | null;
+    gracePeriodDays: number;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -101,10 +114,16 @@ export class LoanConfigService {
       id: config.id,
       groupId: config.groupId,
       interestRate: decimalToNumber(config.interestRate),
-      maxLoanAmount: decimalToNumber(config.maxLoanAmount),
       repaymentPeriodDays: config.repaymentPeriodDays,
-      penaltyRate: decimalToNumber(config.penaltyRate),
+      allowExceedContribution: config.allowExceedContribution,
+      maxLoanMultiplier:
+        config.maxLoanMultiplier == null
+          ? null
+          : decimalToNumber(config.maxLoanMultiplier),
       allowPartialPayments: config.allowPartialPayments,
+      penaltyRate:
+        config.penaltyRate == null ? null : decimalToNumber(config.penaltyRate),
+      gracePeriodDays: config.gracePeriodDays,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     };

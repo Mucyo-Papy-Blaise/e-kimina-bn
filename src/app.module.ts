@@ -10,7 +10,10 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { appConfig } from './config/app.config';
 import { validateEnv } from './config/env.validation';
+import { ContributionConfigModule } from './contribution-config/contribution-config.module';
+import { ContributionsModule } from './contributions/contributions.module';
 import { GroupsModule } from './groups/groups.module';
+import { GroupFinanceModule } from './group-finance/group-finance.module';
 import { HealthModule } from './health/health.module';
 import { LoanConfigModule } from './loan-config/loan-config.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -34,6 +37,9 @@ import { UsersModule } from './users/users.module';
     RolesModule,
     GroupsModule,
     LoanConfigModule,
+    ContributionConfigModule,
+    ContributionsModule,
+    GroupFinanceModule,
     UploadModule,
   ],
   controllers: [AppController],

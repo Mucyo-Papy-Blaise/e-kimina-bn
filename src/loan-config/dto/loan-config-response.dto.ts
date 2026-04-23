@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LoanConfigResponseDto {
   @ApiProperty()
@@ -7,20 +7,26 @@ export class LoanConfigResponseDto {
   @ApiProperty()
   groupId!: string;
 
-  @ApiProperty({ type: Number })
+  @ApiProperty({ type: Number, description: '% per period' })
   interestRate!: number;
-
-  @ApiProperty({ type: Number })
-  maxLoanAmount!: number;
 
   @ApiProperty()
   repaymentPeriodDays!: number;
 
-  @ApiProperty({ type: Number })
-  penaltyRate!: number;
+  @ApiProperty()
+  allowExceedContribution!: boolean;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Optional cap as × contribution' })
+  maxLoanMultiplier!: number | null;
 
   @ApiProperty()
   allowPartialPayments!: boolean;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: '% per period' })
+  penaltyRate!: number | null;
+
+  @ApiProperty()
+  gracePeriodDays!: number;
 
   @ApiProperty()
   createdAt!: Date;

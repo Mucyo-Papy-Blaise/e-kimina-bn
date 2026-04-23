@@ -990,4 +990,45 @@ export class GroupsService {
       );
     }
   }
+
+  /** Same rules as loan config: verified group, active membership, `GROUP_ADMIN` or `TREASURER`. */
+  async assertUserCanAccessContributionConfig(userId: string, groupId: string) {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+    });
+
+    if (!group) {
+      throw new NotFoundException(`Group ${groupId} was not found.`);
+    }
+
+    if (!group.isVerified) {
+      throw new ForbiddenException(
+        'Contribution settings are only available after the group is verified by a super admin.',
+      );
+    }
+
+    const membership = await this.prisma.userGroup.findFirst({
+      where: {
+        userId,
+        groupId,
+        membershipStatus: GroupMembershipStatus.ACTIVE,
+      },
+      include: { role: true },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this group.');
+    }
+
+    const allowed = new Set<RoleName>([
+      RoleName.GROUP_ADMIN,
+      RoleName.TREASURER,
+    ]);
+
+    if (!allowed.has(membership.role.name)) {
+      throw new ForbiddenException(
+        'Only group admins and treasurers can manage contribution settings for this group.',
+      );
+    }
+  }
 }
