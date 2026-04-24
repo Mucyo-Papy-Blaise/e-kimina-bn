@@ -17,6 +17,39 @@ import {
 
 type AppConfig = ReturnType<typeof appConfig>;
 
+function messageFromCloudinaryError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+  if (error && typeof error === 'object') {
+    const o = error as Record<string, unknown>;
+    if (typeof o.message === 'string' && o.message.trim()) {
+      return o.message;
+    }
+    if (o.error && typeof o.error === 'object') {
+      const e = o.error as Record<string, unknown>;
+      if (typeof e.message === 'string' && e.message.trim()) {
+        return e.message;
+      }
+    }
+    if (typeof o.http_code === 'number') {
+      return `Cloudinary error (HTTP ${o.http_code})`;
+    }
+    try {
+      const s = JSON.stringify(error);
+      if (s && s !== '{}') {
+        return s.length > 300 ? `${s.slice(0, 300)}…` : s;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return 'Cloudinary upload failed (see server logs for details).';
+}
+
 export interface UploadResult {
   url: string;
   publicId: string;
@@ -92,14 +125,9 @@ export class UploadService {
           uploadOptions,
           (error: unknown, result: UploadApiResponse | undefined) => {
             if (error) {
-              const message =
-                error instanceof Error
-                  ? error.message
-                  : typeof error === 'string'
-                    ? error
-                    : 'Cloudinary upload failed.';
-
-              reject(new BadRequestException(message));
+              reject(
+                new BadRequestException(messageFromCloudinaryError(error)),
+              );
               return;
             }
 

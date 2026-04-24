@@ -112,6 +112,19 @@ export class GroupsService {
     }
   }
 
+  private async isPlatformSuperAdmin(userId: string): Promise<boolean> {
+    const pr = await this.prisma.userPlatformRole.findFirst({
+      where: { userId },
+      include: { role: true },
+    });
+    return pr?.role.name === RoleName.SUPER_ADMIN;
+  }
+
+  /** Used by group-scoped GET handlers (e.g. contribution config) for oversight without membership. */
+  async isPlatformSuperAdminUser(userId: string): Promise<boolean> {
+    return this.isPlatformSuperAdmin(userId);
+  }
+
   private activeMemberFilter() {
     return { membershipStatus: GroupMembershipStatus.ACTIVE };
   }
@@ -379,10 +392,6 @@ export class GroupsService {
       include: { role: true },
     });
 
-    if (!membership) {
-      throw new ForbiddenException('You do not have access to this group.');
-    }
-
     const group = await this.prisma.group.findUnique({
       where: { id: groupId },
       select: groupSelect,
@@ -395,11 +404,23 @@ export class GroupsService {
     const memberCount = await this.countActiveMembers(groupId);
     const row = this.groupWithMemberCount(group, memberCount);
 
-    return {
-      ...row,
-      myRole: membership.role.name,
-      isGroupAdmin: membership.role.name === RoleName.GROUP_ADMIN,
-    };
+    if (membership) {
+      return {
+        ...row,
+        myRole: membership.role.name,
+        isGroupAdmin: membership.role.name === RoleName.GROUP_ADMIN,
+      };
+    }
+
+    if (await this.isPlatformSuperAdmin(userId)) {
+      return {
+        ...row,
+        myRole: RoleName.MEMBER,
+        isGroupAdmin: false,
+      };
+    }
+
+    throw new ForbiddenException('You do not have access to this group.');
   }
 
   async join(userId: string, groupId: string): Promise<void> {
@@ -741,11 +762,15 @@ export class GroupsService {
       },
       include: { role: true },
     });
-    if (!membership) {
+    const superAdmin =
+      !membership && (await this.isPlatformSuperAdmin(userId));
+
+    if (!membership && !superAdmin) {
       throw new ForbiddenException('You do not have access to this group.');
     }
 
-    const isAdmin = membership.role.name === RoleName.GROUP_ADMIN;
+    const isAdmin =
+      membership?.role.name === RoleName.GROUP_ADMIN || superAdmin;
 
     const rows = await this.prisma.userGroup.findMany({
       where: {

@@ -29,13 +29,22 @@ export class GroupRoleGuard implements CanActivate {
 
     const request = context
       .switchToHttp()
-      .getRequest<{ user?: AuthenticatedUser; params?: { groupId?: string } }>();
+      .getRequest<{
+        user?: AuthenticatedUser;
+        params?: { groupId?: string };
+        method?: string;
+      }>();
 
     const user = request.user;
 
     if (!user) {
       return false;
     }
+
+    const method = (request.method ?? 'GET').toUpperCase();
+    const readOnlySuperAdmin =
+      (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') &&
+      user.platformRole === RoleName.SUPER_ADMIN;
 
     const groupId = request.params?.groupId;
 
@@ -57,6 +66,9 @@ export class GroupRoleGuard implements CanActivate {
     });
 
     if (!membership) {
+      if (readOnlySuperAdmin) {
+        return true;
+      }
       return false;
     }
 

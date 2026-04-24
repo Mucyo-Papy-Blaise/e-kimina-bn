@@ -36,7 +36,10 @@ export class LoanConfigService {
       },
     });
 
-    if (!membership) {
+    if (
+      !membership &&
+      !(await this.groupsService.isPlatformSuperAdminUser(userId))
+    ) {
       throw new ForbiddenException('You are not a member of this group.');
     }
 

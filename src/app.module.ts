@@ -19,6 +19,7 @@ import { LoanConfigModule } from './loan-config/loan-config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesModule } from './roles/roles.module';
 import { UploadModule } from './upload/upload.module';
+import { UserFinanceModule } from './user-finance/user-finance.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -40,6 +41,7 @@ import { UsersModule } from './users/users.module';
     ContributionConfigModule,
     ContributionsModule,
     GroupFinanceModule,
+    UserFinanceModule,
     UploadModule,
   ],
   controllers: [AppController],

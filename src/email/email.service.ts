@@ -8,6 +8,10 @@ import { renderPasswordResetEmail } from './templates/password-reset.template.js
 import { renderMemberInvitationEmail } from './templates/member-invitation.template.js';
 import { renderTreasurerInvitationEmail } from './templates/treasurer-invitation.template.js';
 import { renderVendorCreatedEmail } from './templates/vendor-created.template.js';
+import { renderPaymentDepositConfirmedEmail } from './templates/payment-deposit-confirmed.template.js';
+import { renderPaymentDepositRejectedEmail } from './templates/payment-deposit-rejected.template.js';
+import { renderManualDepositAuditGroupAdminEmail } from './templates/payment-manual-audit-superadmin.template.js';
+import { renderManualDepositPendingGroupAdminEmail } from './templates/payment-manual-pending-superadmin.template.js';
 
 @Injectable()
 export class EmailService {
@@ -160,6 +164,141 @@ export class EmailService {
       subject: `Reset your ${config.appName} password`,
       html,
     });
+  }
+
+  async sendManualDepositConfirmedEmail(
+    toEmail: string,
+    args: {
+      memberName: string;
+      groupName: string;
+      amount: string;
+      currency: string;
+    },
+  ): Promise<void> {
+    const config = getEmailConfig();
+    const html = renderPaymentDepositConfirmedEmail(
+      args.memberName,
+      args.groupName,
+      args.amount,
+      args.currency,
+    );
+    await this.sendEmail({
+      to: toEmail,
+      subject: `Payment confirmed — ${args.groupName} (${config.appName})`,
+      html,
+    });
+  }
+
+  async sendManualDepositRejectedEmail(
+    toEmail: string,
+    args: {
+      memberName: string;
+      groupName: string;
+      amount: string;
+      currency: string;
+      reason: string | null;
+    },
+  ): Promise<void> {
+    const config = getEmailConfig();
+    const html = renderPaymentDepositRejectedEmail(
+      args.memberName,
+      args.groupName,
+      args.amount,
+      args.currency,
+      args.reason,
+    );
+    await this.sendEmail({
+      to: toEmail,
+      subject: `Payment not accepted — ${args.groupName} (${config.appName})`,
+      html,
+    });
+  }
+
+  /** All group admins in that team — when a member submits a manual transfer + proof. */
+  async sendManualDepositPendingToGroupAdmins(
+    toEmails: string[],
+    args: {
+      groupName: string;
+      memberName: string;
+      memberEmail: string;
+      amount: string;
+      currency: string;
+      depositId: string;
+      groupId: string;
+    },
+  ): Promise<void> {
+    if (toEmails.length === 0) {
+      this.logger.warn(
+        'No group admin emails to notify for pending manual deposit (assign a GROUP_ADMIN in this group, or add their email to an active user).',
+      );
+      return;
+    }
+    const config = getEmailConfig();
+    const html = renderManualDepositPendingGroupAdminEmail(
+      args.groupName,
+      args.memberName,
+      args.memberEmail,
+      args.amount,
+      args.currency,
+      args.depositId,
+      args.groupId,
+    );
+    const subject = `Manual payment to verify — ${args.groupName} (${config.appName})`;
+    for (const to of toEmails) {
+      try {
+        await this.sendEmail({ to, subject, html });
+      } catch (e) {
+        this.logger.error(
+          `Failed to email group admin at ${to}: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
+  }
+
+  /** Other group admins in the team (excluding the actor) get an audit copy. */
+  async sendManualDepositAuditToGroupAdmins(
+    toEmails: string[],
+    args: {
+      groupName: string;
+      kind: 'CONFIRMED' | 'REJECTED';
+      memberName: string;
+      amount: string;
+      currency: string;
+      depositId: string;
+      reason: string | null;
+      reviewerName: string;
+    },
+  ): Promise<void> {
+    if (toEmails.length === 0) {
+      return;
+    }
+    const config = getEmailConfig();
+    const subjBase =
+      args.kind === 'CONFIRMED' ? 'Manual payment confirmed' : 'Manual payment rejected';
+    const subject = `${subjBase} (audit) — ${args.groupName} (${config.appName})`;
+    const html = renderManualDepositAuditGroupAdminEmail(
+      args.groupName,
+      args.kind,
+      args.memberName,
+      args.amount,
+      args.currency,
+      args.depositId,
+      args.reason,
+      args.reviewerName,
+    );
+    for (const to of toEmails) {
+      try {
+        await this.sendEmail({ to, subject, html });
+      } catch (e) {
+        this.logger.error(
+          `Failed to send audit email to group admin: ${
+            e instanceof Error ? e.message : String(e)
+          }`,
+        );
+      }
+    }
   }
 
   private htmlToText(html: string): string {

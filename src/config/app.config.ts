@@ -13,9 +13,10 @@ export const appConfig = () => ({
     bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS ?? 12),
   },
   upload: {
-    cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',
-    cloudinaryApiKey: process.env.CLOUDINARY_API_KEY ?? '',
-    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? '',
-    cloudinaryFolder: process.env.CLOUDINARY_FOLDER ?? 'e-kimina',
+    // Trim so trailing/linebreaks in .env do not break Cloudinary HMAC (Invalid Signature).
+    cloudinaryCloudName: (process.env.CLOUDINARY_CLOUD_NAME ?? '').trim(),
+    cloudinaryApiKey: (process.env.CLOUDINARY_API_KEY ?? '').trim(),
+    cloudinaryApiSecret: (process.env.CLOUDINARY_API_SECRET ?? '').trim(),
+    cloudinaryFolder: (process.env.CLOUDINARY_FOLDER ?? 'e-kimina').trim() || 'e-kimina',
   },
 });
