@@ -21,6 +21,7 @@ import { RolesModule } from './roles/roles.module';
 import { UploadModule } from './upload/upload.module';
 import { UserFinanceModule } from './user-finance/user-finance.module';
 import { UsersModule } from './users/users.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { UsersModule } from './users/users.module';
     GroupFinanceModule,
     UserFinanceModule,
     UploadModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

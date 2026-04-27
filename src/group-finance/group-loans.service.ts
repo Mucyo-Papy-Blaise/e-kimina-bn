@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -11,6 +12,7 @@ import {
   Prisma,
   RoleName,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 function decN(v: Prisma.Decimal | null | undefined): number {
@@ -23,7 +25,12 @@ function roundMoney(n: number): number {
 
 @Injectable()
 export class GroupLoansService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(GroupLoansService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private async requireVerifiedGroup(groupId: string) {
     const group = await this.prisma.group.findUnique({ where: { id: groupId } });
@@ -138,7 +145,7 @@ export class GroupLoansService {
     const isAdmin = role === RoleName.GROUP_ADMIN;
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    const out = await this.prisma.$transaction(async (tx) => {
       const app = await tx.loanApplication.findFirst({
         where: { id: applicationId, groupId },
       });
@@ -229,6 +236,42 @@ export class GroupLoansService {
           : 'Treasurer approval recorded. Waiting for group admin approval before the loan is disbursed.',
       };
     });
+
+    if (!out.message?.includes('already on file')) {
+      const app = await this.prisma.loanApplication.findFirst({
+        where: { id: out.applicationId, groupId },
+        include: {
+          user: { select: { fullName: true } },
+          group: { select: { name: true } },
+        },
+      });
+      if (app) {
+        if (out.status === 'APPROVED' && out.memberLoanId) {
+          void this.notifications
+            .notifyLoanDisbursed({
+              borrowerUserId: app.userId,
+              groupId: app.groupId,
+              groupName: app.group.name,
+              amount: decN(app.requestedAmount).toFixed(0),
+              memberLoanId: out.memberLoanId!,
+            })
+            .catch((e) => this.logger.error(e));
+        } else if (out.status === 'PENDING' && out.memberLoanId == null) {
+          void this.notifications
+            .notifyLoanAwaitingOtherApprover({
+              groupId: app.groupId,
+              groupName: app.group.name,
+              applicationId: app.id,
+              applicantName: app.user.fullName,
+              amount: decN(app.requestedAmount).toFixed(0),
+              justApprovedRole: isAdmin ? 'GROUP_ADMIN' : 'TREASURER',
+            })
+            .catch((e) => this.logger.error(e));
+        }
+      }
+    }
+
+    return out;
   }
 
   async rejectLoanApplication(
@@ -244,6 +287,7 @@ export class GroupLoansService {
     }
     const app = await this.prisma.loanApplication.findFirst({
       where: { id: applicationId, groupId },
+      include: { group: { select: { name: true } } },
     });
     if (!app) {
       throw new NotFoundException('Loan application not found.');
@@ -264,6 +308,14 @@ export class GroupLoansService {
         rejectedBy: { connect: { id: reviewerId } },
       },
     });
+    void this.notifications
+      .notifyLoanRejected({
+        borrowerUserId: app.userId,
+        groupId: app.groupId,
+        groupName: app.group.name,
+        reason: r,
+      })
+      .catch((e) => this.logger.error(e));
     return {
       applicationId,
       status: 'REJECTED' as const,

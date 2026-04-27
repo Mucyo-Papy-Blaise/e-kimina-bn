@@ -17,6 +17,7 @@ import {
 import { hash } from 'bcryptjs';
 import { EmailService } from '../email/email.service.js';
 import { appConfig } from '../config/app.config';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RolesService } from '../roles/roles.service';
 import { CreateGroupDto } from './dto/create-group.dto';
@@ -57,6 +58,7 @@ export class GroupsService {
     private readonly rolesService: RolesService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService<AppConfig, true>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private groupWithMemberCount(
@@ -472,6 +474,29 @@ export class GroupsService {
         membershipStatus: GroupMembershipStatus.ACTIVE,
       },
     });
+    const joiner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
+    if (joiner) {
+      void this.notifications
+        .notifyUserAddedToGroup({
+          userId,
+          groupId,
+          groupName: group.name,
+          context: 'joined',
+        })
+        .catch((e) => this.logger.error(e));
+      void this.notifications
+        .notifyLeadersNewMember({
+          groupId,
+          groupName: group.name,
+          memberName: joiner.fullName,
+          memberUserId: userId,
+          how: 'joined',
+        })
+        .catch((e) => this.logger.error(e));
+    }
   }
 
   /**
@@ -587,6 +612,23 @@ export class GroupsService {
           membershipStatus: GroupMembershipStatus.ACTIVE,
         },
       });
+      void this.notifications
+        .notifyUserAddedToGroup({
+          userId: existing.id,
+          groupId,
+          groupName: group.name,
+          context: 'invited',
+        })
+        .catch((e) => this.logger.error(e));
+      void this.notifications
+        .notifyLeadersNewMember({
+          groupId,
+          groupName: group.name,
+          memberName: existing.fullName,
+          memberUserId: existing.id,
+          how: 'invited',
+        })
+        .catch((e) => this.logger.error(e));
       return { message: 'Member added to the group.' };
     }
 
@@ -679,6 +721,14 @@ export class GroupsService {
           : `Could not send the invitation email: ${reason}`,
       );
     }
+
+    void this.notifications
+      .notifyPendingInvitationStored({
+        userId: pendingUserId,
+        groupId,
+        groupName: group.name,
+      })
+      .catch((e) => this.logger.error(e));
 
     return {
       message:

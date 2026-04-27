@@ -49,6 +49,48 @@ enum MemberLoanStatus {
   DEFAULTED
 }
 
+/// In-app user notifications (per-user rows; `audience` allows filtering by member vs admin vs treasurer).
+enum NotificationType {
+  /// Manual bank proof submitted; admins & treasurers should review
+  DEPOSIT_MANUAL_PENDING
+  /// MoMo or confirmed contribution deposit applied to the member
+  DEPOSIT_RECORDED
+  /// MoMo or confirmed payment applied to a loan
+  LOAN_REPAYMENT_RECORDED
+  /// Manual contribution proof was confirmed
+  DEPOSIT_CONFIRMED
+  /// Manual loan repayment proof was confirmed
+  LOAN_REPAYMENT_APPLIED
+  /// Manual transfer rejected
+  DEPOSIT_REJECTED
+  /// New loan application submitted
+  LOAN_APPLICATION_SUBMITTED
+  /// The other approver (admin or treasurer) must still approve
+  LOAN_AWAITING_YOUR_APPROVAL
+  /// Loan disbursed to borrower
+  LOAN_DISBURSED
+  /// Loan application rejected
+  LOAN_REJECTED
+  /// Another admin confirmed a manual deposit (audit for leadership)
+  MANUAL_DEPOSIT_AUDIT_CONFIRM
+  /// Another admin rejected a manual deposit
+  MANUAL_DEPOSIT_AUDIT_REJECT
+  /// Member submitted manual payment proof (pending review)
+  PAYMENT_PROOF_SUBMITTED
+  /// User was added to a group (invite or self-join)
+  ADDED_TO_GROUP
+  /// Group admin / treasurer: a new member joined or was added
+  NEW_GROUP_MEMBER
+  /// Invited by email but must still complete registration (stored for when they log in)
+  GROUP_INVITATION_PENDING
+}
+
+enum NotificationAudience {
+  MEMBER
+  GROUP_ADMIN
+  TREASURER
+}
+
 enum DepositPaymentMethod {
   MTN_MOMO
   MANUAL_TRANSFER
@@ -84,6 +126,7 @@ model User {
   treasurerInvitations TreasurerInvitation[]
   memberInvitations    MemberInvitation[]
   groupRemovalNotifications GroupRemovalNotification[]
+  userNotifications     UserNotification[]
   contributions Contribution[]
   loanApplications  LoanApplication[]
   loanGroupAdminApprovals  LoanApplication[] @relation("LoanAppGroupAdmin")
@@ -118,6 +161,7 @@ model Group {
   loanApplications     LoanApplication[]
   memberLoans         MemberLoan[]
   depositRecords       DepositRecord[]
+  userNotifications    UserNotification[]
 
   @@index([createdById])
   @@map("groups")
@@ -250,6 +294,28 @@ model GroupRemovalNotification {
 
   @@index([userId, readAt])
   @@map("group_removal_notifications")
+}
+
+/// Per-user in-app notification (one row per recipient).
+model UserNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  groupId   String?
+  type      NotificationType
+  audience  NotificationAudience
+  title     String
+  body      String
+  metadata  Json?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@index([userId, audience, readAt, createdAt(sort: Desc)])
+  @@index([groupId, createdAt(sort: Desc)])
+  @@map("user_notifications")
 }
 
 /// Platform-level role: default `USER`, elevated e.g. `SUPER_ADMIN`. Not tied to a group.

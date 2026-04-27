@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { GroupFinanceController } from './group-finance.controller';
 import { GroupFinanceService } from './group-finance.service';
 import { GroupLoansService } from './group-loans.service';
 
 @Module({
-  imports: [PrismaModule, EmailModule],
+  imports: [PrismaModule, EmailModule, NotificationsModule],
   controllers: [GroupFinanceController],
   providers: [GroupFinanceService, GroupLoansService],
   exports: [GroupFinanceService, GroupLoansService],

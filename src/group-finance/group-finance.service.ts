@@ -15,6 +15,7 @@ import {
   RoleName,
 } from '@prisma/client';
 import { EmailService } from '../email/email.service.js';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GroupLoansService } from './group-loans.service';
 
@@ -30,6 +31,7 @@ export class GroupFinanceService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly groupLoans: GroupLoansService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async requireActiveMemberInVerifiedGroup(
@@ -60,7 +62,8 @@ export class GroupFinanceService {
     return { group, membership };
   }
 
-  private async requireGroupAdminInVerifiedGroup(
+  /** Group admin or treasurer: manual deposit review, confirm, reject. */
+  private async requireGroupAdminOrTreasurerInVerifiedGroup(
     userId: string,
     groupId: string,
   ) {
@@ -80,24 +83,24 @@ export class GroupFinanceService {
         userId,
         groupId,
         membershipStatus: GroupMembershipStatus.ACTIVE,
-        role: { name: RoleName.GROUP_ADMIN },
+        role: { name: { in: [RoleName.GROUP_ADMIN, RoleName.TREASURER] } },
       },
       include: { role: true },
     });
     if (!membership) {
       throw new ForbiddenException(
-        'Only a group admin can review or manage manual deposit verification for this group.',
+        'Only a group admin or the treasurer can review or manage manual payment verification for this group.',
       );
     }
     return { group, membership };
   }
 
-  private async getGroupAdminEmailsForGroup(groupId: string): Promise<string[]> {
+  private async getFinanceLeaderEmailsForGroup(groupId: string): Promise<string[]> {
     const rows = await this.prisma.userGroup.findMany({
       where: {
         groupId,
         membershipStatus: GroupMembershipStatus.ACTIVE,
-        role: { name: RoleName.GROUP_ADMIN },
+        role: { name: { in: [RoleName.GROUP_ADMIN, RoleName.TREASURER] } },
       },
       include: { user: { select: { email: true, isActive: true } } },
     });
@@ -110,7 +113,7 @@ export class GroupFinanceService {
     ];
   }
 
-  private async getGroupAdminEmailsForGroupExcluding(
+  private async getFinanceLeaderEmailsForGroupExcluding(
     groupId: string,
     excludeUserId: string,
   ): Promise<string[]> {
@@ -119,7 +122,7 @@ export class GroupFinanceService {
         groupId,
         userId: { not: excludeUserId },
         membershipStatus: GroupMembershipStatus.ACTIVE,
-        role: { name: RoleName.GROUP_ADMIN },
+        role: { name: { in: [RoleName.GROUP_ADMIN, RoleName.TREASURER] } },
       },
       include: { user: { select: { email: true, isActive: true } } },
     });
@@ -308,6 +311,15 @@ export class GroupFinanceService {
             }`,
           );
         }
+        void this.notifications
+          .notifyMemberDepositRecorded({
+            userId,
+            groupId,
+            groupName: group.name,
+            amount: decN(created.amount).toFixed(2),
+            currency: created.currency,
+          })
+          .catch((e) => this.logger.error(e));
       }
 
       return {
@@ -342,10 +354,10 @@ export class GroupFinanceService {
         select: { fullName: true, email: true },
       });
       if (member) {
-        const groupAdminEmails = await this.getGroupAdminEmailsForGroup(groupId);
+        const leaderEmails = await this.getFinanceLeaderEmailsForGroup(groupId);
         try {
           await this.emailService.sendManualDepositPendingToGroupAdmins(
-            groupAdminEmails,
+            leaderEmails,
             {
               groupName: group.name,
               memberName: member.fullName,
@@ -358,18 +370,39 @@ export class GroupFinanceService {
           );
         } catch (e) {
           this.logger.error(
-            `Failed to email group admins about pending manual deposit: ${
+            `Failed to email group leaders about pending manual deposit: ${
               e instanceof Error ? e.message : String(e)
             }`,
           );
         }
+        void this.notifications
+          .notifyManualDepositPending({
+            groupId,
+            groupName: group.name,
+            depositId: created.id,
+            amount: decN(created.amount).toFixed(2),
+            currency: created.currency,
+            memberName: member.fullName,
+            isLoanRepayment: false,
+          })
+          .catch((e) => this.logger.error(e));
+        void this.notifications
+          .notifyMemberPaymentProofSubmitted({
+            userId,
+            groupId,
+            groupName: group.name,
+            amount: decN(created.amount).toFixed(2),
+            currency: created.currency,
+            isLoanRepayment: false,
+          })
+          .catch((e) => this.logger.error(e));
       }
     }
 
     return {
       id: created.id,
       message:
-        'Your payment proof was submitted. A group admin will review it and you will be notified by email.',
+        'Your payment proof was submitted. A group admin or treasurer will review it and you will be notified by email.',
       amount: decN(created.amount),
       currency: created.currency,
       status: created.status,
@@ -481,6 +514,15 @@ export class GroupFinanceService {
             }`,
           );
         }
+        void this.notifications
+          .notifyMemberLoanRepaymentRecorded({
+            userId,
+            groupId,
+            groupName: group.name,
+            amount: decN(created.amount).toFixed(2),
+            currency: created.currency,
+          })
+          .catch((e) => this.logger.error(e));
       }
 
       return {
@@ -516,10 +558,10 @@ export class GroupFinanceService {
         select: { fullName: true, email: true },
       });
       if (member) {
-        const groupAdminEmails = await this.getGroupAdminEmailsForGroup(groupId);
+        const leaderEmails = await this.getFinanceLeaderEmailsForGroup(groupId);
         try {
           await this.emailService.sendManualDepositPendingToGroupAdmins(
-            groupAdminEmails,
+            leaderEmails,
             {
               groupName: group.name,
               memberName: member.fullName,
@@ -532,18 +574,39 @@ export class GroupFinanceService {
           );
         } catch (e) {
           this.logger.error(
-            `Failed to email group admins about pending loan repayment: ${
+            `Failed to email group leaders about pending loan repayment: ${
               e instanceof Error ? e.message : String(e)
             }`,
           );
         }
+        void this.notifications
+          .notifyManualDepositPending({
+            groupId,
+            groupName: group.name,
+            depositId: created.id,
+            amount: decN(created.amount).toFixed(2),
+            currency: created.currency,
+            memberName: member.fullName,
+            isLoanRepayment: true,
+          })
+          .catch((e) => this.logger.error(e));
+        void this.notifications
+          .notifyMemberPaymentProofSubmitted({
+            userId,
+            groupId,
+            groupName: group.name,
+            amount: decN(created.amount).toFixed(2),
+            currency: created.currency,
+            isLoanRepayment: true,
+          })
+          .catch((e) => this.logger.error(e));
       }
     }
 
     return {
       id: created.id,
       message:
-        'Your loan repayment proof was submitted. A group admin will review it and apply it to your loan.',
+        'Your loan repayment proof was submitted. A group admin or treasurer will review it and apply it to your loan.',
       amount: decN(created.amount),
       currency: created.currency,
       status: created.status,
@@ -575,7 +638,7 @@ export class GroupFinanceService {
   }
 
   async listPendingManualDeposits(adminUserId: string, groupId: string) {
-    await this.requireGroupAdminInVerifiedGroup(adminUserId, groupId);
+    await this.requireGroupAdminOrTreasurerInVerifiedGroup(adminUserId, groupId);
     const rows = await this.prisma.depositRecord.findMany({
       where: {
         groupId,
@@ -609,7 +672,7 @@ export class GroupFinanceService {
     groupId: string,
     depositId: string,
   ) {
-    const { group } = await this.requireGroupAdminInVerifiedGroup(
+    const { group } = await this.requireGroupAdminOrTreasurerInVerifiedGroup(
       reviewerId,
       groupId,
     );
@@ -681,7 +744,28 @@ export class GroupFinanceService {
       );
     }
 
-    const auditTo = await this.getGroupAdminEmailsForGroupExcluding(
+    void this.notifications
+      .notifyMemberManualDepositConfirmed({
+        userId: deposit.userId,
+        groupId,
+        groupName: group.name,
+        amount: amountText,
+        currency: deposit.currency,
+        isLoan: Boolean(deposit.memberLoanId),
+      })
+      .catch((e) => this.logger.error(e));
+    void this.notifications
+      .notifyAuditManualConfirm({
+        groupId,
+        groupName: group.name,
+        amount: amountText,
+        currency: deposit.currency,
+        memberName: deposit.user.fullName,
+        excludeUserId: reviewerId,
+      })
+      .catch((e) => this.logger.error(e));
+
+    const auditTo = await this.getFinanceLeaderEmailsForGroupExcluding(
       groupId,
       reviewerId,
     );
@@ -718,7 +802,7 @@ export class GroupFinanceService {
     depositId: string,
     reason: string | undefined,
   ) {
-    const { group } = await this.requireGroupAdminInVerifiedGroup(
+    const { group } = await this.requireGroupAdminOrTreasurerInVerifiedGroup(
       reviewerId,
       groupId,
     );
@@ -771,7 +855,28 @@ export class GroupFinanceService {
       );
     }
 
-    const auditTo = await this.getGroupAdminEmailsForGroupExcluding(
+    void this.notifications
+      .notifyMemberDepositRejected({
+        userId: deposit.userId,
+        groupId,
+        groupName: group.name,
+        amount: amountText,
+        currency: deposit.currency,
+        reason: trimmed,
+      })
+      .catch((e) => this.logger.error(e));
+    void this.notifications
+      .notifyAuditManualReject({
+        groupId,
+        groupName: group.name,
+        amount: amountText,
+        currency: deposit.currency,
+        memberName: deposit.user.fullName,
+        excludeUserId: reviewerId,
+      })
+      .catch((e) => this.logger.error(e));
+
+    const auditTo = await this.getFinanceLeaderEmailsForGroupExcluding(
       groupId,
       reviewerId,
     );
@@ -975,6 +1080,27 @@ export class GroupFinanceService {
         maxAmountSnapshot: new Prisma.Decimal(roundMoney(maxAmount)),
       },
     });
+
+    const g = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      select: { name: true },
+    });
+    if (g) {
+      const member = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true },
+      });
+      void this.notifications
+        .notifyLoanApplicationSubmitted({
+          groupId,
+          groupName: g.name,
+          applicationId: created.id,
+          applicantUserId: userId,
+          applicantName: member?.fullName ?? 'Member',
+          amount: decN(created.requestedAmount).toFixed(0),
+        })
+        .catch((e) => this.logger.error(e));
+    }
 
     return {
       id: created.id,

@@ -88,10 +88,10 @@ export class GroupFinanceController {
   }
 
   @Get('deposits/pending')
-  @GroupRole(RoleName.GROUP_ADMIN)
+  @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
   @ApiOperation({
     summary:
-      'Manual bank transfers with proof pending group admin review (group admin only).',
+      'Manual bank transfers with proof pending review (group admin or treasurer).',
   })
   @ApiParam({ name: 'groupId', type: String })
   @ApiOkResponse({ type: [PendingDepositItemDto] })
@@ -105,9 +105,10 @@ export class GroupFinanceController {
   }
 
   @Post('deposits/:depositId/confirm')
-  @GroupRole(RoleName.GROUP_ADMIN)
+  @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
   @ApiOperation({
-    summary: 'Confirm a manual bank deposit after proof review (applies amounts to contributions)',
+    summary:
+      'Confirm a manual bank deposit after proof review (group admin or treasurer; applies amounts to contributions or loan)',
   })
   @ApiParam({ name: 'groupId', type: String })
   @ApiParam({ name: 'depositId', type: String })
@@ -123,8 +124,10 @@ export class GroupFinanceController {
   }
 
   @Post('deposits/:depositId/reject')
-  @GroupRole(RoleName.GROUP_ADMIN)
-  @ApiOperation({ summary: 'Reject a manual bank deposit; member is notified by email' })
+  @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
+  @ApiOperation({
+    summary: 'Reject a manual bank deposit (group admin or treasurer); member is notified by email',
+  })
   @ApiParam({ name: 'groupId', type: String })
   @ApiParam({ name: 'depositId', type: String })
   @ApiOkResponse({ description: 'Deposit rejected; member emailed' })
