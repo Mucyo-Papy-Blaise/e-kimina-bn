@@ -36,7 +36,10 @@ export class GroupFinanceController {
 
   @Get('deposit-preview')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER, RoleName.MEMBER)
-  @ApiOperation({ summary: 'Amount breakdown for a deposit (contribution, fines, installment)' })
+  @ApiOperation({
+    summary:
+      'Amount breakdown for a deposit (contribution, fines, installment)',
+  })
   @ApiParam({ name: 'groupId', type: String })
   @ApiOkResponse({ type: DepositPreviewResponseDto })
   @ApiNotFoundResponse({ description: 'Group not found' })
@@ -51,7 +54,10 @@ export class GroupFinanceController {
 
   @Post('deposits')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER, RoleName.MEMBER)
-  @ApiOperation({ summary: 'Record a deposit (MoMo or manual); validates against contribution rules' })
+  @ApiOperation({
+    summary:
+      'Record a deposit (MoMo or manual); validates against contribution rules',
+  })
   @ApiParam({ name: 'groupId', type: String })
   @ApiCreatedResponse({ description: 'Deposit recorded' })
   @ApiForbiddenResponse()
@@ -126,7 +132,8 @@ export class GroupFinanceController {
   @Post('deposits/:depositId/reject')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
   @ApiOperation({
-    summary: 'Reject a manual bank deposit (group admin or treasurer); member is notified by email',
+    summary:
+      'Reject a manual bank deposit (group admin or treasurer); member is notified by email',
   })
   @ApiParam({ name: 'groupId', type: String })
   @ApiParam({ name: 'depositId', type: String })
@@ -150,7 +157,8 @@ export class GroupFinanceController {
   @Get('loan-request-preview')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER, RoleName.MEMBER)
   @ApiOperation({
-    summary: 'Eligibility and caps for a loan from group loan rules and member contributions',
+    summary:
+      'Eligibility and caps for a loan from group loan rules and member contributions',
   })
   @ApiParam({ name: 'groupId', type: String })
   @ApiOkResponse({ type: LoanRequestPreviewResponseDto })
@@ -185,9 +193,15 @@ export class GroupFinanceController {
 
   @Get('loan-repayment-preview')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER, RoleName.MEMBER)
-  @ApiOperation({ summary: 'Amount due to repay a specific member loan (group must match the loan)' })
+  @ApiOperation({
+    summary:
+      'Amount due to repay a specific member loan (group must match the loan)',
+  })
   @ApiParam({ name: 'groupId', type: String })
-  @ApiOkResponse({ description: 'Same shape as deposit preview with installment = loan balance' })
+  @ApiOkResponse({
+    description:
+      'Same shape as deposit preview with installment = loan balance',
+  })
   loanRepaymentPreview(
     @CurrentUser() user: AuthenticatedUser,
     @Param('groupId') groupId: string,
@@ -206,7 +220,8 @@ export class GroupFinanceController {
   @Get('loan-applications')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
   @ApiOperation({
-    summary: 'List loan applications for this group (group admin and treasurer; dual approval required to disburse)',
+    summary:
+      'List loan applications for this group (group admin and treasurer; dual approval required to disburse)',
   })
   @ApiParam({ name: 'groupId', type: String })
   listLoanApplications(
@@ -230,7 +245,8 @@ export class GroupFinanceController {
   @Post('loan-applications/:applicationId/approve')
   @GroupRole(RoleName.GROUP_ADMIN, RoleName.TREASURER)
   @ApiOperation({
-    summary: 'Record your approval as group admin or treasurer; loan disburses when both have approved',
+    summary:
+      'Record your approval as group admin or treasurer; loan disburses when both have approved',
   })
   @ApiParam({ name: 'groupId', type: String })
   @ApiParam({ name: 'applicationId', type: String })

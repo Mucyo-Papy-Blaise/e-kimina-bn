@@ -11,7 +11,9 @@ import { CurrentUser } from '../decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { NotificationsService } from './notifications.service.js';
 
-function parseAudience(v: string | undefined): NotificationAudience | undefined {
+function parseAudience(
+  v: string | undefined,
+): NotificationAudience | undefined {
   if (!v) return undefined;
   return (Object.values(NotificationAudience) as string[]).includes(v)
     ? (v as NotificationAudience)
@@ -57,7 +59,10 @@ export class UserNotificationsController {
     @Query('unreadOnly') unreadOnly?: string,
     @Query('limit') limitStr?: string,
   ) {
-    const limit = limitStr != null && limitStr !== '' ? Number.parseInt(limitStr, 10) : undefined;
+    const limit =
+      limitStr != null && limitStr !== ''
+        ? Number.parseInt(limitStr, 10)
+        : undefined;
     return this.notifications.listForUser(user.id, {
       audience: parseAudience(audienceRaw),
       groupId: groupId || undefined,
@@ -67,7 +72,9 @@ export class UserNotificationsController {
   }
 
   @Patch('read-all')
-  @ApiOperation({ summary: 'Mark all notifications (optionally filtered) as read' })
+  @ApiOperation({
+    summary: 'Mark all notifications (optionally filtered) as read',
+  })
   @ApiQuery({ name: 'audience', required: false, enum: NotificationAudience })
   @ApiQuery({ name: 'groupId', required: false, type: String })
   markAllRead(

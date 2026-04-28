@@ -33,7 +33,9 @@ export class GroupLoansService {
   ) {}
 
   private async requireVerifiedGroup(groupId: string) {
-    const group = await this.prisma.group.findUnique({ where: { id: groupId } });
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+    });
     if (!group) throw new NotFoundException(`Group ${groupId} was not found.`);
     if (!group.isVerified) {
       throw new ForbiddenException('This action is only for verified groups.');
@@ -51,7 +53,9 @@ export class GroupLoansService {
       include: { role: true },
     });
     if (!m) {
-      throw new ForbiddenException('You are not an active member of this group.');
+      throw new ForbiddenException(
+        'You are not an active member of this group.',
+      );
     }
     return m;
   }
@@ -60,7 +64,10 @@ export class GroupLoansService {
   private async requireAdminOrTreasurer(userId: string, groupId: string) {
     await this.requireVerifiedGroup(groupId);
     const m = await this.getActiveMembershipWithRole(userId, groupId);
-    if (m.role.name !== RoleName.GROUP_ADMIN && m.role.name !== RoleName.TREASURER) {
+    if (
+      m.role.name !== RoleName.GROUP_ADMIN &&
+      m.role.name !== RoleName.TREASURER
+    ) {
       throw new ForbiddenException(
         'Only a group admin or treasurer can review loan applications.',
       );
@@ -124,7 +131,8 @@ export class GroupLoansService {
       currency: 'RWF',
       interestRate: decN(a.interestRateSnapshot),
       repaymentPeriodDays: a.repaymentPeriodDaysSnapshot,
-      maxAmountAtRequest: a.maxAmountSnapshot != null ? decN(a.maxAmountSnapshot) : null,
+      maxAmountAtRequest:
+        a.maxAmountSnapshot != null ? decN(a.maxAmountSnapshot) : null,
       status: a.status,
       createdAt: a.createdAt.toISOString(),
       groupAdminApproved: gAdmin,
@@ -140,7 +148,11 @@ export class GroupLoansService {
     };
   }
 
-  async approveLoanApplication(approverId: string, groupId: string, applicationId: string) {
+  async approveLoanApplication(
+    approverId: string,
+    groupId: string,
+    applicationId: string,
+  ) {
     const role = await this.requireAdminOrTreasurer(approverId, groupId);
     const isAdmin = role === RoleName.GROUP_ADMIN;
     const now = new Date();
@@ -156,7 +168,9 @@ export class GroupLoansService {
         throw new BadRequestException('This application is no longer pending.');
       }
       if (app.userId === approverId) {
-        throw new ForbiddenException('You cannot approve your own loan application.');
+        throw new ForbiddenException(
+          'You cannot approve your own loan application.',
+        );
       }
       if (isAdmin && app.groupAdminApprovedAt) {
         return {
@@ -187,7 +201,9 @@ export class GroupLoansService {
               treasurerApprovedById: approverId,
             },
       });
-      const after = await tx.loanApplication.findUnique({ where: { id: applicationId } });
+      const after = await tx.loanApplication.findUnique({
+        where: { id: applicationId },
+      });
       if (!after) throw new NotFoundException('Loan application not found.');
 
       const both =
@@ -253,7 +269,7 @@ export class GroupLoansService {
               groupId: app.groupId,
               groupName: app.group.name,
               amount: decN(app.requestedAmount).toFixed(0),
-              memberLoanId: out.memberLoanId!,
+              memberLoanId: out.memberLoanId,
             })
             .catch((e) => this.logger.error(e));
         } else if (out.status === 'PENDING' && out.memberLoanId == null) {
@@ -283,7 +299,9 @@ export class GroupLoansService {
     await this.requireAdminOrTreasurer(reviewerId, groupId);
     const r = (reason ?? '').trim();
     if (r.length < 3) {
-      throw new BadRequestException('Please provide a rejection reason (at least 3 characters).');
+      throw new BadRequestException(
+        'Please provide a rejection reason (at least 3 characters).',
+      );
     }
     const app = await this.prisma.loanApplication.findFirst({
       where: { id: applicationId, groupId },
@@ -296,7 +314,9 @@ export class GroupLoansService {
       throw new BadRequestException('This application is not pending.');
     }
     if (app.userId === reviewerId) {
-      throw new ForbiddenException('You cannot reject your own loan application.');
+      throw new ForbiddenException(
+        'You cannot reject your own loan application.',
+      );
     }
     const now = new Date();
     await this.prisma.loanApplication.update({
@@ -352,7 +372,10 @@ export class GroupLoansService {
     const repaid = decN(l.amountRepaid);
     const outstanding = roundMoney(Math.max(0, total - repaid));
     const now = new Date();
-    const overdue = l.status === MemberLoanStatus.ACTIVE && l.dueDate < now && outstanding > 0.01;
+    const overdue =
+      l.status === MemberLoanStatus.ACTIVE &&
+      l.dueDate < now &&
+      outstanding > 0.01;
     return {
       id: l.id,
       userId: l.userId,
@@ -375,7 +398,11 @@ export class GroupLoansService {
     };
   }
 
-  async getLoanRepaymentPreviewForMember(userId: string, groupId: string, memberLoanId: string) {
+  async getLoanRepaymentPreviewForMember(
+    userId: string,
+    groupId: string,
+    memberLoanId: string,
+  ) {
     await this.getActiveMembershipWithRole(userId, groupId);
     const loan = await this.prisma.memberLoan.findFirst({
       where: { id: memberLoanId, userId, groupId },
@@ -386,7 +413,8 @@ export class GroupLoansService {
     if (loan.status !== MemberLoanStatus.ACTIVE) {
       return {
         configured: false,
-        message: 'This loan is not active; no repayment is due through this flow.',
+        message:
+          'This loan is not active; no repayment is due through this flow.',
       };
     }
     const total = decN(loan.totalRepayable) + decN(loan.penaltyAccrued);
@@ -398,7 +426,9 @@ export class GroupLoansService {
         message: 'This loan is already fully repaid.',
       };
     }
-    const cc = await this.prisma.contributionConfig.findUnique({ where: { groupId } });
+    const cc = await this.prisma.contributionConfig.findUnique({
+      where: { groupId },
+    });
     const allowPartial = cc?.allowPartialPayments ?? true;
     return {
       configured: true,
@@ -425,11 +455,14 @@ export class GroupLoansService {
     );
     if (!preview.configured || !('total' in preview) || preview.total == null) {
       throw new BadRequestException(
-        (preview as { message?: string }).message ?? 'Repayment is not available.',
+        (preview as { message?: string }).message ??
+          'Repayment is not available.',
       );
     }
     const rem = (preview as { total: number }).total;
-    const allowPartial = (preview as { allowPartialPayments?: boolean }).allowPartialPayments ?? true;
+    const allowPartial =
+      (preview as { allowPartialPayments?: boolean }).allowPartialPayments ??
+      true;
     if (allowPartial) {
       if (amount < 0.01 || amount - rem > 0.01) {
         throw new BadRequestException(
@@ -451,7 +484,11 @@ export class GroupLoansService {
     const pay = decN(deposit.amount);
     if (pay < 0.01) return;
     const loan = await tx.memberLoan.findFirst({
-      where: { id: memberLoanId, userId: deposit.userId, groupId: deposit.groupId },
+      where: {
+        id: memberLoanId,
+        userId: deposit.userId,
+        groupId: deposit.groupId,
+      },
     });
     if (!loan) {
       throw new BadRequestException('Member loan not found for this payment.');

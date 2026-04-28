@@ -11,6 +11,7 @@ import {
   DepositRecordStatus,
   GroupMembershipStatus,
   LoanApplicationStatus,
+  MemberLoanStatus,
   Prisma,
   RoleName,
 } from '@prisma/client';
@@ -55,9 +56,12 @@ export class GroupFinanceService {
         groupId,
         membershipStatus: GroupMembershipStatus.ACTIVE,
       },
+      include: { role: true },
     });
     if (!membership) {
-      throw new ForbiddenException('You are not an active member of this group.');
+      throw new ForbiddenException(
+        'You are not an active member of this group.',
+      );
     }
     return { group, membership };
   }
@@ -95,7 +99,9 @@ export class GroupFinanceService {
     return { group, membership };
   }
 
-  private async getFinanceLeaderEmailsForGroup(groupId: string): Promise<string[]> {
+  private async getFinanceLeaderEmailsForGroup(
+    groupId: string,
+  ): Promise<string[]> {
     const rows = await this.prisma.userGroup.findMany({
       where: {
         groupId,
@@ -298,12 +304,15 @@ export class GroupFinanceService {
       if (member) {
         const amountText = decN(created.amount).toFixed(2);
         try {
-          await this.emailService.sendManualDepositConfirmedEmail(member.email, {
-            memberName: member.fullName,
-            groupName: group.name,
-            amount: amountText,
-            currency: created.currency,
-          });
+          await this.emailService.sendManualDepositConfirmedEmail(
+            member.email,
+            {
+              memberName: member.fullName,
+              groupName: group.name,
+              amount: amountText,
+              currency: created.currency,
+            },
+          );
         } catch (e) {
           this.logger.error(
             `Failed to send MTN MoMo deposit confirmation email: ${
@@ -434,12 +443,14 @@ export class GroupFinanceService {
     );
     if (!preview.configured || !('total' in preview) || preview.total == null) {
       throw new BadRequestException(
-        (preview as { message?: string }).message ?? 'Loan repayment is not available.',
+        (preview as { message?: string }).message ??
+          'Loan repayment is not available.',
       );
     }
     const total = (preview as { total: number }).total;
     const allowPartial =
-      (preview as { allowPartialPayments?: boolean }).allowPartialPayments ?? true;
+      (preview as { allowPartialPayments?: boolean }).allowPartialPayments ??
+      true;
     const currency = (preview as { currency: string }).currency;
 
     if (dto.paymentMethod === DepositPaymentMethod.MANUAL_TRANSFER) {
@@ -501,12 +512,15 @@ export class GroupFinanceService {
       });
       if (member) {
         try {
-          await this.emailService.sendManualDepositConfirmedEmail(member.email, {
-            memberName: member.fullName,
-            groupName: group.name,
-            amount: decN(created.amount).toFixed(2),
-            currency: created.currency,
-          });
+          await this.emailService.sendManualDepositConfirmedEmail(
+            member.email,
+            {
+              memberName: member.fullName,
+              groupName: group.name,
+              amount: decN(created.amount).toFixed(2),
+              currency: created.currency,
+            },
+          );
         } catch (e) {
           this.logger.error(
             `Failed to send loan repayment confirmation email: ${
@@ -638,7 +652,10 @@ export class GroupFinanceService {
   }
 
   async listPendingManualDeposits(adminUserId: string, groupId: string) {
-    await this.requireGroupAdminOrTreasurerInVerifiedGroup(adminUserId, groupId);
+    await this.requireGroupAdminOrTreasurerInVerifiedGroup(
+      adminUserId,
+      groupId,
+    );
     const rows = await this.prisma.depositRecord.findMany({
       where: {
         groupId,
@@ -686,10 +703,14 @@ export class GroupFinanceService {
       throw new NotFoundException('Deposit not found.');
     }
     if (deposit.status !== DepositRecordStatus.PENDING_VERIFICATION) {
-      throw new BadRequestException('This deposit is not awaiting manual proof verification.');
+      throw new BadRequestException(
+        'This deposit is not awaiting manual proof verification.',
+      );
     }
     if (deposit.paymentMethod !== DepositPaymentMethod.MANUAL_TRANSFER) {
-      throw new BadRequestException('Only manual bank transfers are confirmed from this list.');
+      throw new BadRequestException(
+        'Only manual bank transfers are confirmed from this list.',
+      );
     }
 
     const reviewer = await this.prisma.user.findUnique({
@@ -730,12 +751,15 @@ export class GroupFinanceService {
 
     const amountText = decN(deposit.amount).toFixed(2);
     try {
-      await this.emailService.sendManualDepositConfirmedEmail(deposit.user.email, {
-        memberName: deposit.user.fullName,
-        groupName: group.name,
-        amount: amountText,
-        currency: deposit.currency,
-      });
+      await this.emailService.sendManualDepositConfirmedEmail(
+        deposit.user.email,
+        {
+          memberName: deposit.user.fullName,
+          groupName: group.name,
+          amount: amountText,
+          currency: deposit.currency,
+        },
+      );
     } catch (e) {
       this.logger.error(
         `Failed to send deposit confirmation email: ${
@@ -816,10 +840,14 @@ export class GroupFinanceService {
       throw new NotFoundException('Deposit not found.');
     }
     if (deposit.status !== DepositRecordStatus.PENDING_VERIFICATION) {
-      throw new BadRequestException('This deposit is not awaiting manual proof verification.');
+      throw new BadRequestException(
+        'This deposit is not awaiting manual proof verification.',
+      );
     }
     if (deposit.paymentMethod !== DepositPaymentMethod.MANUAL_TRANSFER) {
-      throw new BadRequestException('Only manual bank transfers can be rejected from this list.');
+      throw new BadRequestException(
+        'Only manual bank transfers can be rejected from this list.',
+      );
     }
 
     const trimmed = reason?.trim() ?? null;
@@ -840,13 +868,16 @@ export class GroupFinanceService {
 
     const amountText = decN(deposit.amount).toFixed(2);
     try {
-      await this.emailService.sendManualDepositRejectedEmail(deposit.user.email, {
-        memberName: deposit.user.fullName,
-        groupName: group.name,
-        amount: amountText,
-        currency: deposit.currency,
-        reason: trimmed,
-      });
+      await this.emailService.sendManualDepositRejectedEmail(
+        deposit.user.email,
+        {
+          memberName: deposit.user.fullName,
+          groupName: group.name,
+          amount: amountText,
+          currency: deposit.currency,
+          reason: trimmed,
+        },
+      );
     } catch (e) {
       this.logger.error(
         `Failed to send manual deposit rejection email: ${
@@ -985,6 +1016,15 @@ export class GroupFinanceService {
   async getLoanRequestPreview(userId: string, groupId: string) {
     await this.requireActiveMemberInVerifiedGroup(userId, groupId);
 
+    const unpaidLoan = await this.prisma.memberLoan.findFirst({
+      where: {
+        userId,
+        groupId,
+        status: { in: [MemberLoanStatus.ACTIVE, MemberLoanStatus.DEFAULTED] },
+      },
+      select: { id: true },
+    });
+
     const loanConfig = await this.prisma.loanConfig.findUnique({
       where: { groupId },
     });
@@ -1022,6 +1062,21 @@ export class GroupFinanceService {
 
     maxAmount = roundMoney(maxAmount);
     const canRequest = maxAmount > 0;
+    if (unpaidLoan) {
+      return {
+        configured: true,
+        canRequest: false,
+        currency: 'RWF',
+        minAmount: 0.01,
+        maxAmount,
+        totalContributed: roundMoney(totalContributed),
+        interestRate,
+        repaymentPeriodDays,
+        allowExceedContribution: allowExceed,
+        message:
+          'You already have an unpaid loan in this group. Repay it before applying for another loan.',
+      };
+    }
 
     return {
       configured: true,
@@ -1041,7 +1096,23 @@ export class GroupFinanceService {
     groupId: string,
     requestedAmount: number,
   ) {
-    await this.requireActiveMemberInVerifiedGroup(userId, groupId);
+    const { membership } = await this.requireActiveMemberInVerifiedGroup(
+      userId,
+      groupId,
+    );
+    const unpaidLoan = await this.prisma.memberLoan.findFirst({
+      where: {
+        userId,
+        groupId,
+        status: { in: [MemberLoanStatus.ACTIVE, MemberLoanStatus.DEFAULTED] },
+      },
+      select: { id: true },
+    });
+    if (unpaidLoan) {
+      throw new BadRequestException(
+        'You already have an unpaid loan in this group. Repay it before applying for another loan.',
+      );
+    }
 
     const loanConfig = await this.prisma.loanConfig.findUnique({
       where: { groupId },
@@ -1053,7 +1124,9 @@ export class GroupFinanceService {
     const preview = await this.getLoanRequestPreview(userId, groupId);
 
     if (!preview.configured) {
-      throw new BadRequestException('You cannot request a loan in this group yet.');
+      throw new BadRequestException(
+        'You cannot request a loan in this group yet.',
+      );
     }
 
     if (!preview.canRequest) {
@@ -1069,6 +1142,8 @@ export class GroupFinanceService {
       );
     }
 
+    const applicantRole = membership.role?.name;
+    const now = new Date();
     const created = await this.prisma.loanApplication.create({
       data: {
         userId,
@@ -1078,6 +1153,18 @@ export class GroupFinanceService {
         interestRateSnapshot: loanConfig.interestRate,
         repaymentPeriodDaysSnapshot: loanConfig.repaymentPeriodDays,
         maxAmountSnapshot: new Prisma.Decimal(roundMoney(maxAmount)),
+        ...(applicantRole === RoleName.GROUP_ADMIN
+          ? {
+              groupAdminApprovedAt: now,
+              groupAdminApprovedById: userId,
+            }
+          : {}),
+        ...(applicantRole === RoleName.TREASURER
+          ? {
+              treasurerApprovedAt: now,
+              treasurerApprovedById: userId,
+            }
+          : {}),
       },
     });
 
@@ -1107,7 +1194,11 @@ export class GroupFinanceService {
       status: created.status,
       requestedAmount: decN(created.requestedAmount),
       message:
-        'Your loan request was submitted. Both the group admin and the treasurer must approve before it is disbursed.',
+        applicantRole === RoleName.GROUP_ADMIN
+          ? 'Your loan request was submitted. Group admin approval was auto-recorded, and treasurer approval is still required before disbursement.'
+          : applicantRole === RoleName.TREASURER
+            ? 'Your loan request was submitted. Treasurer approval was auto-recorded, and group admin approval is still required before disbursement.'
+            : 'Your loan request was submitted. Both the group admin and the treasurer must approve before it is disbursed.',
     };
   }
 }

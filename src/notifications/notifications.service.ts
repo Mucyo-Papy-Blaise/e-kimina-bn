@@ -13,7 +13,10 @@ export class NotificationsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async userIdsByRoles(groupId: string, roles: RoleName[]): Promise<string[]> {
+  private async userIdsByRoles(
+    groupId: string,
+    roles: RoleName[],
+  ): Promise<string[]> {
     const rows = await this.prisma.userGroup.findMany({
       where: {
         groupId,
@@ -46,7 +49,7 @@ export class NotificationsService {
           audience: row.audience,
           title: row.title,
           body: row.body,
-          ...(row.metadata != null && { metadata: row.metadata as object }),
+          ...(row.metadata != null && { metadata: row.metadata }),
         })),
       });
     } catch (e) {
@@ -81,7 +84,9 @@ export class NotificationsService {
     isLoanRepayment: boolean;
   }) {
     const admins = await this.userIdsByRoles(p.groupId, [RoleName.GROUP_ADMIN]);
-    const treasurers = await this.userIdsByRoles(p.groupId, [RoleName.TREASURER]);
+    const treasurers = await this.userIdsByRoles(p.groupId, [
+      RoleName.TREASURER,
+    ]);
     const type = NotificationType.DEPOSIT_MANUAL_PENDING;
     const title = p.isLoanRepayment
       ? 'Loan repayment proof to review'
@@ -127,7 +132,11 @@ export class NotificationsService {
       audience: NotificationAudience.MEMBER,
       title: 'Payment recorded',
       body: `Your ${p.amount} ${p.currency} payment was applied in ${p.groupName}.`,
-      metadata: { groupName: p.groupName, amount: p.amount, currency: p.currency },
+      metadata: {
+        groupName: p.groupName,
+        amount: p.amount,
+        currency: p.currency,
+      },
     });
   }
 
@@ -144,7 +153,11 @@ export class NotificationsService {
       audience: NotificationAudience.MEMBER,
       title: 'Loan payment recorded',
       body: `Your ${p.amount} ${p.currency} loan payment was applied in ${p.groupName}.`,
-      metadata: { groupName: p.groupName, amount: p.amount, currency: p.currency },
+      metadata: {
+        groupName: p.groupName,
+        amount: p.amount,
+        currency: p.currency,
+      },
     });
   }
 
@@ -169,7 +182,11 @@ export class NotificationsService {
       audience: NotificationAudience.MEMBER,
       title,
       body,
-      metadata: { groupName: p.groupName, amount: p.amount, currency: p.currency },
+      metadata: {
+        groupName: p.groupName,
+        amount: p.amount,
+        currency: p.currency,
+      },
     });
   }
 
@@ -201,10 +218,16 @@ export class NotificationsService {
     memberName: string;
     excludeUserId: string;
   }) {
-    const allAdmins = await this.userIdsByRoles(p.groupId, [RoleName.GROUP_ADMIN]);
-    const treasurers = await this.userIdsByRoles(p.groupId, [RoleName.TREASURER]);
+    const allAdmins = await this.userIdsByRoles(p.groupId, [
+      RoleName.GROUP_ADMIN,
+    ]);
+    const treasurers = await this.userIdsByRoles(p.groupId, [
+      RoleName.TREASURER,
+    ]);
     const others = [
-      ...new Set([...allAdmins, ...treasurers].filter((id) => id !== p.excludeUserId)),
+      ...new Set(
+        [...allAdmins, ...treasurers].filter((id) => id !== p.excludeUserId),
+      ),
     ];
     for (const uid of others) {
       const aud: NotificationAudience = allAdmins.includes(uid)
@@ -229,10 +252,16 @@ export class NotificationsService {
     memberName: string;
     excludeUserId: string;
   }) {
-    const allAdmins = await this.userIdsByRoles(p.groupId, [RoleName.GROUP_ADMIN]);
-    const treasurers = await this.userIdsByRoles(p.groupId, [RoleName.TREASURER]);
+    const allAdmins = await this.userIdsByRoles(p.groupId, [
+      RoleName.GROUP_ADMIN,
+    ]);
+    const treasurers = await this.userIdsByRoles(p.groupId, [
+      RoleName.TREASURER,
+    ]);
     const others = [
-      ...new Set([...allAdmins, ...treasurers].filter((id) => id !== p.excludeUserId)),
+      ...new Set(
+        [...allAdmins, ...treasurers].filter((id) => id !== p.excludeUserId),
+      ),
     ];
     for (const uid of others) {
       const aud: NotificationAudience = allAdmins.includes(uid)
@@ -270,7 +299,9 @@ export class NotificationsService {
       },
     });
     const admins = await this.userIdsByRoles(p.groupId, [RoleName.GROUP_ADMIN]);
-    const treasurers = await this.userIdsByRoles(p.groupId, [RoleName.TREASURER]);
+    const treasurers = await this.userIdsByRoles(p.groupId, [
+      RoleName.TREASURER,
+    ]);
     await this.createMany(
       admins.filter((id) => id !== p.applicantUserId),
       {
@@ -305,7 +336,9 @@ export class NotificationsService {
     justApprovedRole: 'GROUP_ADMIN' | 'TREASURER';
   }) {
     if (p.justApprovedRole === 'GROUP_ADMIN') {
-      const treasurers = await this.userIdsByRoles(p.groupId, [RoleName.TREASURER]);
+      const treasurers = await this.userIdsByRoles(p.groupId, [
+        RoleName.TREASURER,
+      ]);
       await this.createMany(treasurers, {
         groupId: p.groupId,
         type: NotificationType.LOAN_AWAITING_YOUR_APPROVAL,
@@ -315,7 +348,9 @@ export class NotificationsService {
         metadata: { applicationId: p.applicationId, groupName: p.groupName },
       });
     } else {
-      const admins = await this.userIdsByRoles(p.groupId, [RoleName.GROUP_ADMIN]);
+      const admins = await this.userIdsByRoles(p.groupId, [
+        RoleName.GROUP_ADMIN,
+      ]);
       await this.createMany(admins, {
         groupId: p.groupId,
         type: NotificationType.LOAN_AWAITING_YOUR_APPROVAL,
@@ -373,7 +408,9 @@ export class NotificationsService {
       groupId: p.groupId,
       type: NotificationType.PAYMENT_PROOF_SUBMITTED,
       audience: NotificationAudience.MEMBER,
-      title: p.isLoanRepayment ? 'Loan repayment received' : 'Payment proof received',
+      title: p.isLoanRepayment
+        ? 'Loan repayment received'
+        : 'Payment proof received',
       body: p.isLoanRepayment
         ? `We received your ${p.amount} ${p.currency} loan repayment proof in ${p.groupName}. A group admin or treasurer will review it.`
         : `We received your ${p.amount} ${p.currency} transfer proof in ${p.groupName}. A group admin or treasurer will review it.`,
@@ -396,7 +433,10 @@ export class NotificationsService {
       groupId: p.groupId,
       type: NotificationType.ADDED_TO_GROUP,
       audience: NotificationAudience.MEMBER,
-      title: p.context === 'joined' ? 'Welcome to the group' : 'You were added to a group',
+      title:
+        p.context === 'joined'
+          ? 'Welcome to the group'
+          : 'You were added to a group',
       body,
       metadata: { groupName: p.groupName, context: p.context },
     });
@@ -427,12 +467,21 @@ export class NotificationsService {
     how: 'invited' | 'joined';
   }) {
     const howText =
-      p.how === 'joined' ? 'joined the group' : 'was added to the group by an admin';
+      p.how === 'joined'
+        ? 'joined the group'
+        : 'was added to the group by an admin';
     const body = `${p.memberName} ${howText} in “${p.groupName}”.`;
     const admins = await this.userIdsByRoles(p.groupId, [RoleName.GROUP_ADMIN]);
-    const treasurers = await this.userIdsByRoles(p.groupId, [RoleName.TREASURER]);
-    const title = p.how === 'joined' ? 'New group member' : 'New member in your group';
-    const meta = { groupName: p.groupName, memberUserId: p.memberUserId, how: p.how };
+    const treasurers = await this.userIdsByRoles(p.groupId, [
+      RoleName.TREASURER,
+    ]);
+    const title =
+      p.how === 'joined' ? 'New group member' : 'New member in your group';
+    const meta = {
+      groupName: p.groupName,
+      memberUserId: p.memberUserId,
+      how: p.how,
+    };
     await this.createMany(
       admins.filter((id) => id !== p.memberUserId),
       {
