@@ -19,6 +19,20 @@ export interface EmailConfig {
   appName: string;
 }
 
+function pickFrontendUrl(): string {
+  const direct =
+    process.env.FRONTEND_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (direct) return direct;
+
+  const corsFirst = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .find((v) => v.length > 0);
+  if (corsFirst) return corsFirst;
+
+  return "http://localhost:3000";
+}
+
 /**
  * SMTP settings are read only from environment variables (see `validateEnv`).
  * Do not hardcode host/port/credentials here — use `.env` (`SMTP_HOST`, etc.).
@@ -42,10 +56,7 @@ export function getEmailConfig(): EmailConfig {
       },
     },
     appUrl: process.env.APP_URL || 'http://localhost:4000',
-    frontendUrl:
-      process.env.FRONTEND_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      'http://localhost:3000',
+    frontendUrl: pickFrontendUrl(),
     appName: process.env.APP_NAME || 'nest-app',
   };
 }
