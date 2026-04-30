@@ -26,7 +26,10 @@ export class EmailService {
       port: config.smtp.port,
       secure: config.smtp.secure,
       auth: config.smtp.auth,
-    });
+      tls: {
+        rejectUnauthorized: false,
+      },
+    } as nodemailer.TransportOptions);
 
     if (config.smtp.host.trim()) {
       void this.verifyConnection();
@@ -276,7 +279,9 @@ export class EmailService {
     }
     const config = getEmailConfig();
     const subjBase =
-      args.kind === 'CONFIRMED' ? 'Manual payment confirmed' : 'Manual payment rejected';
+      args.kind === 'CONFIRMED'
+        ? 'Manual payment confirmed'
+        : 'Manual payment rejected';
     const subject = `${subjBase} (audit) — ${args.groupName} (${config.appName})`;
     const html = renderManualDepositAuditGroupAdminEmail(
       args.groupName,

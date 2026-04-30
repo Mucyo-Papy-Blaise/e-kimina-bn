@@ -58,7 +58,10 @@ export class AuthService {
         where: { token: invitationToken },
       });
       if (treasurerInv) {
-        return this.registerWithTreasurerInvitation(registerDto, invitationToken);
+        return this.registerWithTreasurerInvitation(
+          registerDto,
+          invitationToken,
+        );
       }
       const memberInv = await this.prisma.memberInvitation.findUnique({
         where: { token: invitationToken },
