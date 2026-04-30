@@ -26,10 +26,11 @@ export class EmailService {
       port: config.smtp.port,
       secure: config.smtp.secure,
       auth: config.smtp.auth,
+      family: 4, // 👈 Force IPv4
       tls: {
         rejectUnauthorized: false,
       },
-    } as nodemailer.TransportOptions);
+    } as any); // 👈 bypass TypeScript strict typing
 
     if (config.smtp.host.trim()) {
       void this.verifyConnection();
